@@ -4,7 +4,7 @@ const User = require('../models/User');
 const chatSocket = require('./chat.socket');
 const callSocket = require('./call.socket');
 const groupCallSocket = require('./groupCall.socket');
-const streamSocket = require('./stream.socket');
+const monitoringSocket = require('./monitoring.socket');
 const { presenceSocket, setIO } = require('./presence.socket');
 const logger = require('../utils/logger');
 const { CLIENT_URL } = require('../config/env');
@@ -52,7 +52,12 @@ const initSocket = (server) => {
     chatSocket(io, socket);
     callSocket(io, socket);
     groupCallSocket(io, socket);
-    streamSocket(io, socket);
+    monitoringSocket(io, socket);
+  });
+
+  // Prevent any unhandled Socket.IO errors from crashing the process
+  io.engine.on('connection_error', (err) => {
+    logger.error(`Socket.IO engine connection error: ${err?.message || err}`);
   });
 
   return io;

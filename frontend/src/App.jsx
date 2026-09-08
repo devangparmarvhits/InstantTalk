@@ -2,7 +2,7 @@ import React from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { CallProvider } from './context/CallContext';
 import { GroupCallProvider } from './context/GroupCallContext';
-import { StreamProvider } from './context/StreamContext';
+import LiveMonitoringProvider from './context/LiveMonitoringContext';
 import GlobalCallOverlay from './components/call/GlobalCallOverlay';
 import GroupGlobalCallOverlay from './components/call/GroupGlobalCallOverlay';
 import AppRoutes from './routes/AppRoutes';
@@ -12,11 +12,11 @@ function App() {
     <AuthProvider>
       <CallProvider>
         <GroupCallProvider>
-          <StreamProvider>
+          <LiveMonitoringProvider>
             <AppRoutes />
             <GlobalCallOverlay />
             <GroupGlobalCallOverlay />
-          </StreamProvider>
+          </LiveMonitoringProvider>
         </GroupCallProvider>
       </CallProvider>
     </AuthProvider>

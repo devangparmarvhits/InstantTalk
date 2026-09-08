@@ -6,9 +6,7 @@ import Register from '../pages/Register';
 import ChatPage from '../pages/Chat';
 import Profile from '../pages/Profile';
 import Calls from '../pages/Calls';
-import LiveStreams from '../pages/LiveStreams';
-import StreamPage from '../pages/LiveStreams/StreamPage';
-import StreamerFloatingBar from '../components/stream/StreamerFloatingBar';
+import { LiveMonitoring } from '../pages/LiveStreams';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
@@ -49,12 +47,10 @@ const AppRoutes = () => {
         <Route path="/people" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
         <Route path="/groups" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
         <Route path="/calls" element={<ProtectedRoute><Calls /></ProtectedRoute>} />
-        <Route path="/live" element={<ProtectedRoute><LiveStreams /></ProtectedRoute>} />
-        <Route path="/live/:streamId" element={<ProtectedRoute><StreamPage /></ProtectedRoute>} />
+        <Route path="/monitoring" element={<ProtectedRoute><LiveMonitoring /></ProtectedRoute>} />
         <Route path="/" element={<Navigate to="/chat" replace />} />
         <Route path="*" element={<Navigate to="/chat" replace />} />
       </Routes>
-      <StreamerFloatingBar />
     </BrowserRouter>
   );
 };
