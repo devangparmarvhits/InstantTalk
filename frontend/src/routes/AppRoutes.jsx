@@ -8,6 +8,7 @@ import Profile from '../pages/Profile';
 import Calls from '../pages/Calls';
 import LiveStreams from '../pages/LiveStreams';
 import StreamPage from '../pages/LiveStreams/StreamPage';
+import StreamerFloatingBar from '../components/stream/StreamerFloatingBar';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
@@ -53,6 +54,7 @@ const AppRoutes = () => {
         <Route path="/" element={<Navigate to="/chat" replace />} />
         <Route path="*" element={<Navigate to="/chat" replace />} />
       </Routes>
+      <StreamerFloatingBar />
     </BrowserRouter>
   );
 };

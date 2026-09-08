@@ -43,6 +43,7 @@ const LiveStreams = () => {
       const stream = await startStream({
         title: data.title,
         description: data.description,
+        stream: data.stream,
       });
       setShowGoLive(false);
       navigate(`/live/${stream._id}`);

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import { StreamContext } from '../../context/StreamContext';
+import { getSocket } from '../../socket/socket';
 import Sidebar from '../../components/common/Sidebar';
 import StreamerView from '../../components/stream/StreamerView';
 import StreamViewer from '../../components/stream/StreamViewer';
@@ -10,12 +11,13 @@ import { getStream } from '../../services/stream.service';
 const StreamPage = () => {
   const { streamId } = useParams();
   const { user } = useContext(AuthContext);
-  const { myStream, joinStream, leaveStream, streamEnded, activeStream, setStreamEnded } = useContext(StreamContext);
+  const { myStream, setMyStream, joinStream, leaveStream, streamEnded, activeStream, setActiveStream, setStreamEnded, setIsStreamer, setupStreamListeners, startStreamerWebRTC, startCamera, setViewerCount } = useContext(StreamContext);
   const navigate = useNavigate();
   const [stream, setStream] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isMyStream, setIsMyStream] = useState(false);
+  const isMineRef = useRef(false);
 
   useEffect(() => {
     const loadStream = async () => {
@@ -35,10 +37,29 @@ const StreamPage = () => {
         // Check if this is the current user's stream
         const isMine = fetchedStream.streamer?._id === user?._id;
         setIsMyStream(isMine);
+        isMineRef.current = isMine;
 
         if (!isMine) {
           // Join as viewer
           joinStream(fetchedStream);
+        } else {
+          // Streamer: join the stream room via socket and set active stream
+          setActiveStream(fetchedStream);
+          setMyStream(fetchedStream);
+          setIsStreamer(true);
+          // Sync viewer count from the API so the streamer sees the real count
+          // even before any socket events arrive (e.g. when viewers are already
+          // connected before the streamer reloads the page).
+          setViewerCount(fetchedStream.viewerCount || 0);
+          const socket = getSocket();
+          if (socket) {
+            socket.emit('stream:join-as-streamer', { streamId: fetchedStream._id });
+            setupStreamListeners(socket, fetchedStream._id, true);
+          }
+          // Start the camera now so viewers can connect immediately after a refresh
+          startCamera();
+          // Start WebRTC (safe to call multiple times)
+          startStreamerWebRTC(fetchedStream._id);
         }
       } catch (err) {
         setError('Failed to load stream');
@@ -50,7 +71,10 @@ const StreamPage = () => {
     loadStream();
 
     return () => {
-      leaveStream();
+      // Only leave stream for viewers, not streamer
+      if (!isMineRef.current) {
+        leaveStream();
+      }
     };
   }, [streamId, user?._id]);
 

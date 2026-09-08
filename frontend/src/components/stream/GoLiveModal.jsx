@@ -10,17 +10,19 @@ const GoLiveModal = ({ onStart, onCancel }) => {
   const [selectedMic, setSelectedMic] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
-  // Enumerate devices
+  // Enumerate devices once the preview stream has granted permission.
   useEffect(() => {
     const enumerate = async () => {
       try {
-        // Request permission first
-        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        tempStream.getTracks().forEach((t) => t.stop());
-
+        // Wait for the preview stream to be active so enumerateDevices()
+        // returns labels and we don't grab a second camera streams.
+        for (let i = 0; i < 50 && !streamRef.current; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+        }
         const allDevices = await navigator.mediaDevices.enumerateDevices();
         const cameras = allDevices.filter((d) => d.kind === 'videoinput');
         const mics = allDevices.filter((d) => d.kind === 'audioinput');
@@ -34,50 +36,119 @@ const GoLiveModal = ({ onStart, onCancel }) => {
     enumerate();
   }, []);
 
-  // Start camera preview
-  const startPreview = useCallback(async (videoDeviceId, audioDeviceId, videoEnabled, audioEnabled) => {
-    // Stop existing stream
+  // Stop the current preview stream (if any)
+  const stopPreview = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
     }
-
-    try {
-      const constraints = {};
-      if (videoEnabled) {
-        constraints.video = videoDeviceId ? { deviceId: { exact: videoDeviceId } } : true;
-      } else {
-        constraints.video = false;
-      }
-      if (audioEnabled) {
-        constraints.audio = audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true;
-      } else {
-        constraints.audio = false;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      setError('Failed to start camera preview');
-    }
+    if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
+  // Start camera preview. Falls back to video-only or audio-only if the
+  // combined camera+mic request is denied (e.g. mic blocked but camera OK),
+  // so a working camera still starts instead of showing "permission denied".
+  const startPreview = useCallback(async (videoDeviceId, audioDeviceId, videoEnabled, audioEnabled) => {
+    // Skip if a matching preview is already running (device id is unconstrained
+    // until the user picks one from the list, so '' always matches)
+    const stream = streamRef.current;
+    const haveVideo = !!(stream && stream.getVideoTracks().length > 0);
+    const haveAudio = !!(stream && stream.getAudioTracks().length > 0);
+    const videoId = stream?.getVideoTracks()[0]?.getSettings?.().deviceId || '';
+    const audioId = stream?.getAudioTracks()[0]?.getSettings?.().deviceId || '';
+    if (
+      stream &&
+      haveVideo === videoEnabled &&
+      haveAudio === audioEnabled &&
+      (!videoDeviceId || videoId === videoDeviceId) &&
+      (!audioDeviceId || audioId === audioDeviceId)
+    ) {
+      return;
+    }
+
+    stopPreview();
+
+    const acquire = (v, a) => {
+      const constraints = {};
+      constraints.video = v ? (videoDeviceId ? { deviceId: { exact: videoDeviceId } } : true) : false;
+      constraints.audio = a ? (audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true) : false;
+      return navigator.mediaDevices.getUserMedia(constraints);
+    };
+
+    let acquired = null;
+    try {
+      try {
+        acquired = await acquire(videoEnabled, audioEnabled);
+      } catch (err) {
+        // The previous preview may not have been fully released yet — retry once.
+        await new Promise((r) => setTimeout(r, 400));
+        try {
+          acquired = await acquire(videoEnabled, audioEnabled);
+        } catch {
+          // Combined request denied — try each permission separately.
+          if (videoEnabled) {
+            try { acquired = await acquire(true, false); } catch {}
+          }
+          if (!acquired && audioEnabled) {
+            try { acquired = await acquire(false, true); } catch {}
+          }
+        }
+      }
+
+      if (acquired) {
+        streamRef.current = acquired;
+        if (videoRef.current) videoRef.current.srcObject = acquired;
+        setCameraOn(acquired.getVideoTracks().length > 0);
+        setMicOn(acquired.getAudioTracks().length > 0);
+        setError('');
+
+        // Explain which input is blocked so the user knows what to allow.
+        let hint = '';
+        if (videoEnabled && !acquired.getVideoTracks().length) {
+          hint = 'Camera is unavailable. Allow camera access in site settings and restart the feed.';
+        } else if (audioEnabled && !acquired.getAudioTracks().length) {
+          hint = 'Microphone is unavailable. Allow mic access in site settings, or check your Windows/Safari privacy settings, then go live again.';
+        }
+        setNotice(hint);
+      } else {
+        console.error('Failed to start camera preview: permission denied');
+        setNotice('');
+        setError(
+          videoEnabled || audioEnabled
+            ? 'Camera/microphone permission denied. Allow access in site settings and retry.'
+            : 'Failed to start camera preview'
+        );
+      }
+    } catch (err) {
+      console.error('Failed to start camera preview:', err);
+      setNotice('');
+      setError('Failed to start camera preview');
+    }
+  }, [stopPreview]);
+
+  // (Re)start the preview when the camera/mic toggles or the modal mounts.
   useEffect(() => {
     if (cameraOn || micOn) {
       startPreview(selectedCamera, selectedMic, cameraOn, micOn);
-    } else if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      if (videoRef.current) videoRef.current.srcObject = null;
+    } else {
+      stopPreview();
     }
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      }
-    };
-  }, [selectedCamera, selectedMic, cameraOn, micOn, startPreview]);
+  }, [cameraOn, micOn, selectedCamera, selectedMic, startPreview, stopPreview]);
+
+  // Stop the preview stream on unmount
+  useEffect(() => () => stopPreview(), [stopPreview]);
+
+  const handleCameraChange = (e) => {
+    const id = e.target.value;
+    setSelectedCamera(id);
+    if (cameraOn) startPreview(id, selectedMic, cameraOn, micOn);
+  };
+
+  const handleMicChange = (e) => {
+    const id = e.target.value;
+    setSelectedMic(id);
+    if (micOn) startPreview(selectedCamera, id, cameraOn, micOn);
+  };
 
   const toggleCamera = () => setCameraOn((prev) => !prev);
   const toggleMic = () => setMicOn((prev) => !prev);
@@ -95,6 +166,9 @@ const GoLiveModal = ({ onStart, onCancel }) => {
         description: description.trim(),
         stream: streamRef.current,
       });
+      // Stream ownership is now with StreamContext — don't stop its tracks on unmount.
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
     } catch (err) {
       setError(err.message || 'Failed to start stream');
     } finally {
@@ -206,7 +280,7 @@ const GoLiveModal = ({ onStart, onCancel }) => {
                 <select
                   className="form-input"
                   value={selectedCamera}
-                  onChange={(e) => setSelectedCamera(e.target.value)}
+                  onChange={handleCameraChange}
                   disabled={loading || !cameraOn}
                 >
                   {devices.cameras.map((cam) => (
@@ -223,7 +297,7 @@ const GoLiveModal = ({ onStart, onCancel }) => {
                 <select
                   className="form-input"
                   value={selectedMic}
-                  onChange={(e) => setSelectedMic(e.target.value)}
+                  onChange={handleMicChange}
                   disabled={loading || !micOn}
                 >
                   {devices.mics.map((mic) => (
@@ -237,6 +311,7 @@ const GoLiveModal = ({ onStart, onCancel }) => {
           </div>
 
           {error && <div className="stream-error">{error}</div>}
+          {notice && !error && <div className="stream-error">{notice}</div>}
         </div>
 
         <div className="stream-modal-footer">

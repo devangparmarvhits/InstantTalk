@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { login as loginApi, register as registerApi, getMe } from '../services/auth.service';
 import { initSocket, disconnectSocket } from '../socket/socket';
 
@@ -95,7 +95,22 @@ export const AuthProvider = ({ children }) => {
     return u;
   }, []);
 
+  // Callbacks run right before the user is logged out, so contexts can clean up
+  // active sessions (live streams, calls, group calls, etc.).
+  const logoutCallbacks = useRef([]);
+  const registerLogoutCallback = useCallback((cb) => {
+    logoutCallbacks.current.push(cb);
+    return () => {
+      logoutCallbacks.current = logoutCallbacks.current.filter((c) => c !== cb);
+    };
+  }, []);
+
   const logout = useCallback(() => {
+    // Let every registered context clean up before we wipe the session.
+    logoutCallbacks.current.forEach((cb) => {
+      try { cb(); } catch (err) { console.error('logout cleanup error:', err); }
+    });
+    logoutCallbacks.current = [];
     disconnectSocket();
     setUser(null);
     setToken(null);
@@ -108,7 +123,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser, applyAppearance }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser, applyAppearance, registerLogoutCallback }}>
       {children}
     </AuthContext.Provider>
   );

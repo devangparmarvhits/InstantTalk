@@ -6,7 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 const StreamChat = ({ isStreamer, onRemoveViewer, onBlockViewer }) => {
   const { user } = useContext(AuthContext);
-  const { streamChatMessages, sendStreamChat, deleteStreamChatMessage, streamViewers } = useContext(StreamContext);
+  const { streamChatMessages, sendStreamChat, deleteStreamChatMessage, streamViewers, activeStream } = useContext(StreamContext);
   const [message, setMessage] = useState('');
   const [showMenu, setShowMenu] = useState(null);
   const messagesEndRef = useRef(null);
@@ -110,7 +110,7 @@ const StreamChat = ({ isStreamer, onRemoveViewer, onBlockViewer }) => {
           streamChatMessages.map((msg) => (
             <div
               key={msg._id}
-              className={`stream-chat-msg ${msg.userId === user?._id ? 'mine' : ''}`}
+              className={`stream-chat-msg ${msg.userId === user?._id ? 'mine' : ''} ${activeStream?.streamer?._id === msg.userId ? 'host-msg' : ''}`}
               onMouseEnter={() => isStreamer && msg.userId !== user?._id && setShowMenu(msg._id)}
               onMouseLeave={() => setShowMenu(null)}
             >
@@ -118,6 +118,9 @@ const StreamChat = ({ isStreamer, onRemoveViewer, onBlockViewer }) => {
               <div className="stream-chat-msg-content">
                 <div className="stream-chat-msg-header">
                   <span className="stream-chat-msg-name">{msg.user?.name || 'User'}</span>
+                  {activeStream?.streamer?._id === msg.userId && (
+                    <span className="stream-chat-host-badge">HOST</span>
+                  )}
                   <span className="stream-chat-msg-time">{formatTime(msg.timestamp)}</span>
                 </div>
                 <p className="stream-chat-msg-text">{msg.content}</p>

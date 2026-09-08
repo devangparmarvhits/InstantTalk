@@ -60,6 +60,8 @@ const endStream = async (req, res) => {
 
     stream.status = 'ended';
     stream.endedAt = new Date();
+    stream.viewers = [];
+    stream.viewerCount = 0;
     await stream.save();
 
     return successResponse(res, { stream: stream.toObject() }, 'Stream ended');

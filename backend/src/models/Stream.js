@@ -40,6 +40,10 @@ const streamSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    totalViews: {
+      type: Number,
+      default: 0,
+    },
     startedAt: {
       type: Date,
       default: Date.now,

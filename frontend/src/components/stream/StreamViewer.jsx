@@ -6,103 +6,248 @@ import { getSocket } from '../../socket/socket';
 import StreamChat from './StreamChat';
 import Avatar from '../user/Avatar';
 
+const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+
 const StreamViewer = ({ stream }) => {
   const { user } = useContext(AuthContext);
-  const { viewerCount, sendStreamChat } = useContext(StreamContext);
+  const { viewerCount } = useContext(StreamContext);
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const connectedRef = useRef(false);
+  const retryStopRef = useRef(false);
+  const pendingCandidatesRef = useRef([]);
   const [connected, setConnected] = useState(false);
+  const [error, setError] = useState('');
   const [duration, setDuration] = useState(0);
   const [showChat, setShowChat] = useState(true);
 
-  // Setup WebRTC connection to receive stream
+  // Setup WebRTC — wait for streamer to send us an offer
   useEffect(() => {
     if (!stream?._id) return;
 
-    const setupWebRTC = async () => {
+    const socket = getSocket();
+    if (!socket) {
+      retryStopRef.current = true;
+      setError('Not connected to server');
+      return;
+    }
+
+    let cancelled = false;
+
+    const createPeerConnection = () => {
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+      pc.ontrack = (event) => {
+        if (!cancelled && videoRef.current && event.streams[0]) {
+          videoRef.current.srcObject = event.streams[0];
+          videoRef.current.play().catch(() => {});
+          connectedRef.current = true;
+          setConnected(true);
+          setError('');
+        }
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate && stream.streamer) {
+          const streamerId = stream.streamer?._id || stream.streamer;
+          socket.emit('stream:ice-candidate', {
+            streamId: stream._id,
+            candidate: event.candidate,
+            targetUserId: streamerId,
+          });
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (cancelled) return;
+        if (pc.connectionState === 'failed') {
+          setError('Connection failed. Try refreshing.');
+        }
+      };
+
+      peerConnectionRef.current = pc;
+      return pc;
+    };
+
+    const handleOffer = async ({ streamId, offer, fromUserId }) => {
+      if (streamId !== stream._id) return;
+      const pc = peerConnectionRef.current;
+      if (!pc) return;
       try {
-        const socket = getSocket();
-        if (!socket) return;
+        const state = pc.signalingState;
+        if (state !== 'stable' && state !== 'have-local-offer') {
+          console.warn(`Ignoring offer — state: ${state}`);
+          return;
+        }
+        if (state === 'have-local-offer') {
+          await pc.setLocalDescription({ type: 'rollback' });
+        }
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-        const pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-        });
-        peerConnectionRef.current = pc;
-
-        pc.ontrack = (event) => {
-          if (videoRef.current && event.streams[0]) {
-            videoRef.current.srcObject = event.streams[0];
-            setConnected(true);
-          }
-        };
-
-        pc.onicecandidate = (event) => {
-          if (event.candidate) {
-            // Find streamer socket and send candidate
-            socket.emit('stream:ice-candidate', {
-              streamId: stream._id,
-              candidate: event.candidate,
-              targetUserId: stream.streamer?._id || stream.streamer,
-            });
-          }
-        };
-
-        pc.onconnectionstatechange = () => {
-          if (pc.connectionState === 'connected') {
-            setConnected(true);
-          }
-        };
-
-        // Listen for streamer's offer
-        socket.off('stream:offer');
-        socket.on('stream:offer', async ({ streamId, offer, fromUserId }) => {
-          if (streamId !== stream._id) return;
+        // Flush any ICE candidates that arrived before the offer
+        const queue = pendingCandidatesRef.current;
+        pendingCandidatesRef.current = [];
+        queue.forEach((c) => {
           try {
-            await pc.setRemoteDescription(new RTCSessionDescription(offer));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            socket.emit('stream:answer', {
-              streamId,
-              answer: pc.localDescription,
-              targetUserId: fromUserId,
-            });
-          } catch (err) {
-            console.error('Error handling offer:', err);
-          }
+            pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+          } catch {}
         });
-
-        // Listen for ICE candidates from streamer
-        socket.off('stream:ice-candidate:viewer');
-        socket.on('stream:ice-candidate:viewer', ({ streamId, candidate }) => {
-          if (streamId !== stream._id) return;
-          try {
-            pc.addIceCandidate(new RTCIceCandidate(candidate));
-          } catch (err) {
-            console.error('Error adding ICE candidate:', err);
-          }
-        });
-
-        // Request stream from the broadcaster
-        // The streamer will respond with an offer
-        socket.emit('stream:request-offer', {
-          streamId: stream._id,
-          viewerId: user?._id,
+        if (pc.signalingState !== 'have-remote-offer') {
+          console.warn(`Skipping answer — state after setRemoteDescription: ${pc.signalingState}`);
+          return;
+        }
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit('stream:answer', {
+          streamId,
+          answer: pc.localDescription,
+          targetUserId: fromUserId,
         });
       } catch (err) {
-        console.error('WebRTC setup error:', err);
+        console.error('Error handling offer:', err);
       }
     };
 
-    setupWebRTC();
+    const handleIceCandidate = ({ streamId, candidate, fromUserId }) => {
+      if (streamId !== stream._id) return;
+      const pc = peerConnectionRef.current;
+      if (!pc) return;
+      // Buffer candidates until we have the remote description so none are lost
+      if (!pc.remoteDescription) {
+        pendingCandidatesRef.current.push(candidate);
+        return;
+      }
+      try {
+        pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.error('Error adding ICE candidate:', err);
+      }
+    };
+
+    const handleStreamEnded = ({ streamId }) => {
+      if (streamId !== stream._id) return;
+      retryStopRef.current = true;
+      setConnected(false);
+      setError('Live stream has ended.');
+    };
+
+    const handleRemoved = ({ streamId: sid }) => {
+      if (sid !== stream._id) return;
+      retryStopRef.current = true;
+      setError('You have been removed from this stream.');
+      setConnected(false);
+    };
+
+    const handleBlocked = ({ streamId: sid }) => {
+      if (sid !== stream._id) return;
+      retryStopRef.current = true;
+      setError('You have been blocked from this stream.');
+      setConnected(false);
+    };
+
+    const handleStreamError = ({ message }) => {
+      // Stop retrying when the stream is no longer joinable
+      if (!message) return;
+      const text = String(message).toLowerCase();
+      if (text.includes('not live') || text.includes('blocked')) {
+        retryStopRef.current = true;
+        setConnected(false);
+        setError(message);
+      }
+    };
+
+    // Streamer toggled screen share or tracks changed — re-bind the stream to the video element
+    const handleTracksChanged = ({ streamId: sid }) => {
+      if (sid !== stream._id) return;
+      const pc = peerConnectionRef.current;
+      // Re-attach the current receiving stream so the video element picks up the new track
+      const receivers = pc?.getReceivers?.() || [];
+      const track = receivers.find((r) => r.track.kind === 'video')?.track;
+      if (track && videoRef.current) {
+        const newStream = new MediaStream([track, ...receivers.filter((r) => r.track.kind === 'audio').map((r) => r.track)]);
+        videoRef.current.srcObject = newStream;
+        videoRef.current.play().catch(() => {});
+        setConnected(true);
+        setError('');
+      }
+    };
+
+    // Join the stream room — this triggers the backend to tell the streamer
+    const joinStream = () => {
+      socket.emit('stream:join-as-viewer', { streamId: stream._id });
+    };
+
+    // Create the initial PeerConnection before joining
+    createPeerConnection();
+
+    // Reset connection state for reconnects
+    connectedRef.current = false;
+
+    socket.on('stream:offer', handleOffer);
+    socket.on('stream:ice-candidate', handleIceCandidate);
+    socket.on('stream:ended', handleStreamEnded);
+    socket.on('stream:removed', handleRemoved);
+    socket.on('stream:blocked', handleBlocked);
+    socket.on('stream:tracks-changed', handleTracksChanged);
+    socket.on('stream:error', handleStreamError);
+
+    // Join the stream room — this triggers the backend to tell the streamer
+    joinStream();
+
+    // Streamer refreshed their page — quickly re-establish the connection
+    const reconnect = () => {
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+      pendingCandidatesRef.current = [];
+      connectedRef.current = false;
+      createPeerConnection();
+      joinStream();
+    };
+
+    const handleStreamerReconnected = ({ streamId: sid }) => {
+      if (sid !== stream._id) return;
+      reconnect();
+    };
+
+    socket.on('stream:streamer-reconnected', handleStreamerReconnected);
+
+    // Retry: if not connected within 2.5 seconds, re-create PC and re-join.
+    // Uses a ref so the interval always sees the latest connection state.
+    const retryInterval = setInterval(() => {
+      if (cancelled) return;
+      if (retryStopRef.current) return;
+      if (connectedRef.current) return;
+      // Close old PC
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+      // Create fresh PC
+      createPeerConnection();
+      // Re-join
+      joinStream();
+    }, 2500);
 
     return () => {
+      cancelled = true;
+      clearInterval(retryInterval);
+      socket.off('stream:offer', handleOffer);
+      socket.off('stream:ice-candidate', handleIceCandidate);
+      socket.off('stream:ended', handleStreamEnded);
+      socket.off('stream:removed', handleRemoved);
+      socket.off('stream:blocked', handleBlocked);
+      socket.off('stream:tracks-changed', handleTracksChanged);
+      socket.off('stream:streamer-reconnected', handleStreamerReconnected);
+      socket.off('stream:error', handleStreamError);
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
         peerConnectionRef.current = null;
       }
     };
-  }, [stream?._id]);
+  }, [stream?._id, stream?.streamer]);
 
   // Duration timer
   useEffect(() => {
@@ -122,11 +267,6 @@ const StreamViewer = ({ stream }) => {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const handleCopyLink = () => {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url).catch(() => {});
-  };
-
   const handleShare = async () => {
     const url = window.location.href;
     if (navigator.share) {
@@ -136,7 +276,7 @@ const StreamViewer = ({ stream }) => {
         // User cancelled
       }
     } else {
-      handleCopyLink();
+      navigator.clipboard.writeText(url).catch(() => {});
     }
   };
 
@@ -147,12 +287,32 @@ const StreamViewer = ({ stream }) => {
       <div className="stream-viewer-main">
         {/* Video Area */}
         <div className="stream-viewer-video-area">
-          <video ref={videoRef} autoPlay playsInline className="stream-viewer-video" />
+          <video ref={videoRef} autoPlay muted playsInline className="stream-viewer-video" />
 
-          {!connected && (
+          {/* Connecting overlay */}
+          {!connected && !error && (
             <div className="stream-viewer-connecting">
               <div className="loading-spinner" />
               <span>Connecting to stream...</span>
+            </div>
+          )}
+
+          {/* Error overlay */}
+          {error && (
+            <div className="stream-viewer-connecting" style={{ background: 'rgba(0,0,0,0.8)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32" style={{ color: 'var(--danger)' }}>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+              <span>{error}</span>
+              <button
+                className="stream-viewer-ctrl-btn"
+                onClick={() => navigate('/live')}
+                style={{ marginTop: '8px' }}
+              >
+                Back to Live Streams
+              </button>
             </div>
           )}
 

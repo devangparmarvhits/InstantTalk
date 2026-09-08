@@ -24,6 +24,25 @@ const createGroup = async (req, res) => {
   }
 };
 
+const getUserGroups = async (req, res) => {
+  try {
+    const conversations = await Conversation.find({
+      isGroup: true,
+      participants: req.user._id,
+      hiddenFor: { $ne: req.user._id },
+    })
+      .populate('participants', 'name avatar isOnline lastSeen')
+      .populate('createdBy', 'name avatar')
+      .populate('lastMessage', 'content sender createdAt')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    return successResponse(res, { conversations }, 'User groups fetched');
+  } catch (error) {
+    return errorResponse(res, error.message);
+  }
+};
+
 const getGroupInfo = async (req, res) => {
   try {
     const conversation = await Conversation.findById(req.params.groupId)
@@ -57,4 +76,4 @@ const updateGroup = async (req, res) => {
   }
 };
 
-module.exports = { createGroup, getGroupInfo, updateGroup };
+module.exports = { createGroup, getUserGroups, getGroupInfo, updateGroup };

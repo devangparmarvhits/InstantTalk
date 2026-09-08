@@ -4,7 +4,8 @@ const { getUsers, updateProfile, updateSettings } = require('../controllers/user
 const { protect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
-const upload = multer({ dest: 'uploads/' });
+const path = require('path');
+const upload = multer({ dest: path.join(__dirname, '../../uploads') });
 
 router.get('/', protect, getUsers);
 router.put('/profile', protect, upload.single('avatar'), updateProfile);
