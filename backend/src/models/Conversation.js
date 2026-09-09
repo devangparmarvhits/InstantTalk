@@ -47,11 +47,6 @@ const conversationSchema = new mongoose.Schema(
       of: Number,
       default: {},
     },
-    isFavorite: {
-      type: Map,
-      of: Boolean,
-      default: {},
-    },
     mutedBy: [
       {
         type: mongoose.Schema.Types.ObjectId,

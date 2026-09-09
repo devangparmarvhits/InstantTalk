@@ -6,7 +6,7 @@ import Avatar from '../user/Avatar';
 import ConversationContextMenu from './ConversationContextMenu';
 import { format, isToday, isYesterday } from 'date-fns';
 import { formatLastSeen } from '../../utils/format';
-import { getOrCreateConversation, getUsers, toggleFavorite, clearConversation, deleteConversation } from '../../services/chat.service';
+import { getOrCreateConversation, getUsers, clearConversation, deleteConversation } from '../../services/chat.service';
 import api from '../../services/api';
 import { createGroup, getUserGroups, addMembers, removeMember, deleteGroup, leaveGroup, deleteGroup as deleteGroupApi, promoteToAdmin, demoteFromAdmin } from '../../services/group.service';
 import { onSocketConnect } from '../../socket/socket';
@@ -88,9 +88,11 @@ const getConvPreview = (conversation, currentUserId) => {
   if (msg.type === 'call') {
     try {
       const p = JSON.parse(msg.content || '{}');
-      const callLabel = p.callType === 'video' ? 'Video call' : 'Voice call';
-      const status = p.status === 'missed' ? 'Missed' : p.status === 'declined' ? 'Cancelled' : '';
-      return `${prefix}${callLabel}${status ? ` · ${status}` : ''}`;
+      const isMissed = p.status === 'missed';
+      const isCancelled = p.status === 'declined';
+      const callLabel = `${isMissed ? 'Missed ' : ''}${p.callType === 'video' ? 'Video call' : 'Voice call'}`;
+      const duration = Number(p.duration) > 0 ? ` · ${Math.floor(p.duration / 60)}m ${p.duration % 60}s` : '';
+      return `${prefix}${callLabel}${isCancelled ? ' · Cancelled' : ''}${duration}`;
     } catch {
       return `${prefix}Voice call`;
     }
@@ -100,7 +102,7 @@ const getConvPreview = (conversation, currentUserId) => {
   return `${prefix}${text}`;
 };
 
-const TABS = ['All', 'Unread', 'Favorites'];
+const TABS = ['All', 'Unread'];
 
 /* ═══════════════════════════════════════════════
    MAIN COMPONENT
@@ -176,9 +178,7 @@ const ChatList = () => {
   const pageTitle = { '/chat': 'Chats', '/people': 'People', '/groups': 'Groups', '/calls': 'Calls' }[location.pathname] || 'Chats';
 
   const getUnread = (c) => c.unreadCount?.get?.(user?._id) || c.unreadCount?.[user?._id] || 0;
-  const getFav = (c) => c.isFavorite?.get?.(user?._id) || c.isFavorite?.[user?._id] || false;
   const unreadCount = conversations.reduce((sum, c) => sum + (getUnread(c) > 0 ? 1 : 0), 0);
-  const favCount = conversations.reduce((sum, c) => sum + (getFav(c) ? 1 : 0), 0);
 
   const filteredConversations = conversations
     .filter((c) => {
@@ -187,14 +187,9 @@ const ChatList = () => {
       const name = other?.name || '';
       const matchesSearch = name.toLowerCase().includes(debouncedSearch.toLowerCase());
       if (activeTab === 'Unread') return matchesSearch && getUnread(c) > 0;
-      if (activeTab === 'Favorites') return matchesSearch && getFav(c);
       return matchesSearch;
     })
-    .sort((a, b) => {
-      const favoriteOrder = Number(getFav(b)) - Number(getFav(a));
-      if (favoriteOrder !== 0) return favoriteOrder;
-      return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
-    });
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
 
   const filteredGroups = groups.filter((g) => {
     return (g.groupName || '').toLowerCase().includes(debouncedSearch.toLowerCase());
@@ -205,11 +200,6 @@ const ChatList = () => {
   );
 
   /* ─── Actions ─── */
-  const handleToggleFavorite = async (e, convId) => {
-    e?.stopPropagation?.();
-    try { await toggleFavorite(convId); loadConversations(); } catch (err) { console.error(err); }
-  };
-
   const closeConversationMenu = useCallback(() => setConversationMenu(null), []);
 
   const handleConversationMenu = (event, conversation) => {
@@ -352,7 +342,7 @@ const ChatList = () => {
         {location.pathname === '/chat' && (
           <div className="filter-tabs">
             {TABS.map((tab) => {
-              const count = tab === 'Unread' ? unreadCount : tab === 'Favorites' ? favCount : null;
+              const count = tab === 'Unread' ? unreadCount : null;
               return (
                 <button key={tab} id={`tab-${tab.toLowerCase()}`} className={`filter-tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
                   {tab}{count != null && count > 0 ? ` (${count})` : ''}
@@ -476,11 +466,6 @@ const ChatList = () => {
                     <div className="conv-info">
                       <div className="conv-top">
                         <span className="conv-name">{other?.name || 'Unknown'}</span>
-                        {getFav(conv) && (
-                          <svg viewBox="0 0 24 24" fill="#f59e0b" stroke="none" width="12" height="12" style={{ flexShrink: 0 }}>
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                          </svg>
-                        )}
                         <span className="conv-time">{conv.lastMessage ? formatConvTime(conv.updatedAt) : ''}</span>
                       </div>
                       <div className="conv-bottom">
@@ -502,11 +487,9 @@ const ChatList = () => {
         <ConversationContextMenu
           x={conversationMenu.x}
           y={conversationMenu.y}
-          isFavorite={getFav(conversationMenu.conversation)}
           deleteLabel={conversationMenu.conversation.isGroup ? 'Delete group' : 'Delete user'}
           blockLabel={conversationMenu.conversation.isGroup ? 'Leave group' : 'Block user'}
           onClose={closeConversationMenu}
-          onFavorite={() => handleToggleFavorite(null, conversationMenu.conversation._id)}
           onClear={() => requestConfirmation('clear', conversationMenu.conversation)}
           onDelete={() => conversationMenu.conversation.isGroup
             ? requestConfirmation('deleteGroup', conversationMenu.conversation)

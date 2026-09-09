@@ -711,10 +711,10 @@ const StreamerPanel = ({ onStop, localStreamRef }) => {
 
           {sharingState === 'requesting' ? (
             /* Waiting for permission */
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, zIndex: 1 }}>
-              <Spinner size={40} color="#f59e0b" />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, zIndex: 1 }}>
+              <Spinner size={32} color="#f59e0b" />
               <div style={{ textAlign: 'center' }}>
-                <div style={{ color: '#f59e0b', fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+                <div style={{ color: '#f59e0b', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
                   Waiting for permission…
                 </div>
                 <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
@@ -724,37 +724,37 @@ const StreamerPanel = ({ onStop, localStreamRef }) => {
             </div>
           ) : isSharing ? (
             /* Actively sharing */
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, zIndex: 1 }}>
-              {/* Big animated monitor icon */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, zIndex: 1 }}>
+              {/* Animated monitor icon */}
               <div style={{
-                width: 80, height: 80, borderRadius: '50%',
+                width: 64, height: 64, borderRadius: '50%',
                 background: 'linear-gradient(135deg, rgba(108,99,255,0.25), rgba(167,139,250,0.15))',
                 border: '1.5px solid rgba(108,99,255,0.4)',
                 display: 'grid', placeItems: 'center',
                 color: '#a78bfa',
-                boxShadow: '0 0 40px rgba(108,99,255,0.25)',
+                boxShadow: '0 0 30px rgba(108,99,255,0.2)',
                 animation: 'pulse-live 2.5s infinite',
               }}>
-                <MonitorIcon size={38} />
+                <MonitorIcon size={30} />
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+                <div style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
                   Screen is being shared
                 </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                   Viewers can see your browser tab in real time
                 </div>
               </div>
-              {/* Session timer large display */}
+              {/* Session timer pill */}
               <div style={{
-                padding: '10px 24px',
+                padding: '8px 18px',
                 background: 'rgba(108,99,255,0.12)',
                 border: '1px solid rgba(108,99,255,0.25)',
-                borderRadius: 12,
-                display: 'flex', alignItems: 'center', gap: 10,
+                borderRadius: 10,
+                display: 'flex', alignItems: 'center', gap: 8,
               }}>
-                <TimerIcon size={16} />
-                <span style={{ fontFamily: 'monospace', fontSize: 22, fontWeight: 800, color: '#a78bfa', letterSpacing: '2px' }}>
+                <TimerIcon size={14} />
+                <span style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#a78bfa', letterSpacing: '1.5px' }}>
                   {formatDuration(sessionDuration)}
                 </span>
               </div>
@@ -769,15 +769,15 @@ const StreamerPanel = ({ onStop, localStreamRef }) => {
         </div>
 
         {/* Stats bar */}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <StatChip icon={TimerIcon} label="Session" value={formatDuration(sessionDuration)} accent />
           <StatChip icon={UsersIcon} label="Viewers" value={viewerList.length} />
           <StatChip icon={SignalIcon} label="Quality" value={
             { good: 'Good', medium: 'Medium', poor: 'Poor', unknown: '—' }[connectionQuality] || '—'
           } />
           <div style={{ marginLeft: 'auto' }}>
-            <button className="mon-btn mon-btn-danger" onClick={onStop}>
-              <StopIcon size={14} /> Stop Monitoring
+            <button className="mon-btn mon-btn-danger" onClick={onStop} style={{ padding: '8px 16px', fontSize: 12 }}>
+              <StopIcon size={13} /> Stop Monitoring
             </button>
           </div>
         </div>
@@ -919,13 +919,13 @@ const ViewerPanel = ({ panelRef, fullscreen, onToggleFullscreen }) => {
         {/* Video surface */}
         <div
           ref={panelRef}
-          style={{ position: 'relative', background: '#060810', aspectRatio: '16/9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ position: 'relative', background: '#060810', flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <video
             ref={videoRef}
             autoPlay
             playsInline
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
           />
 
           {!streamer && (
@@ -958,18 +958,18 @@ const ViewerPanel = ({ panelRef, fullscreen, onToggleFullscreen }) => {
         </div>
 
         {/* Control bar */}
-        <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {streamer && (
             <>
-              <div style={{ flex: 1, display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1, display: 'flex', gap: 6, minWidth: 0 }}>
                 <StatChip icon={TimerIcon} label="Session" value={formatDuration(sessionDuration)} accent />
                 <StatChip icon={SignalIcon} label="Connection" value={{ good: 'Good', medium: 'Medium', poor: 'Poor', unknown: '—' }[connectionQuality] || '—'} />
               </div>
-              <button className="mon-btn mon-btn-ghost" onClick={onToggleFullscreen} style={{ gap: 6 }}>
-                <FullscreenIcon size={14} /> Full Screen
+              <button className="mon-btn mon-btn-ghost" onClick={onToggleFullscreen} style={{ gap: 6, padding: '8px 12px', fontSize: 12 }}>
+                <FullscreenIcon size={13} /> Full Screen
               </button>
-              <button className="mon-btn mon-btn-danger" onClick={stopWatching} style={{ gap: 6 }}>
-                <XIcon size={14} /> Stop Viewing
+              <button className="mon-btn mon-btn-danger" onClick={stopWatching} style={{ gap: 6, padding: '8px 14px', fontSize: 12 }}>
+                <XIcon size={13} /> Stop Viewing
               </button>
             </>
           )}
@@ -1003,7 +1003,7 @@ const ViewerPanel = ({ panelRef, fullscreen, onToggleFullscreen }) => {
           />
         </div>
 
-        <div style={{ maxHeight: 500, overflowY: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {filtered.length === 0 ? (
             <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
               <p style={{ margin: 0 }}>

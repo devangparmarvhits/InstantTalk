@@ -124,13 +124,66 @@ const ChatWindow = () => {
   }, []);
 
   const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      const el = messagesAreaRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
+    const el = messagesAreaRef.current;
+    if (!el) return;
+
+    // Only scroll the NEW messages region, not the entire chat.
+    // New messages start at index prevMsgCountRef.current.
+    // Find the first new message DOM element by querying all message bubbles
+    // in order, then scroll from just above it to the bottom.
+    const firstNewMsgIndex = prevMsgCountRef.current;
+    // Query all message-row elements in DOM order (excludes date dividers and typing indicator)
+    const msgEls = el.querySelectorAll('.message-row');
+    const firstNewMsgEl = msgEls[firstNewMsgIndex];
+
+    const targetScroll = el.scrollHeight;
+    let scrollStart;
+    if (firstNewMsgEl) {
+      // Position the first new message at the bottom edge of the viewport
+      // so it's the first thing the user sees as scrolling begins.
+      const firstMsgBottom = firstNewMsgEl.offsetTop + firstNewMsgEl.offsetHeight;
+      scrollStart = firstMsgBottom - el.clientHeight;
+      // Important: do NOT clamp to current scrollTop.
+      // If first new message is above current view, we jump to it instantly
+      // (non-animated), then animate only through the new messages.
+    } else {
+      scrollStart = el.scrollTop;
+    }
+
+    // If the first new message is NOT in the current viewport,
+    // instantly jump to it first (no animation).
+    // This ensures we never scroll through old messages.
+    // Then animate only through the new messages region.
+    if (scrollStart !== el.scrollTop) {
+      el.scrollTop = scrollStart;
+    }
+
+    const distance = targetScroll - el.scrollTop;
+    if (distance <= 0) {
       setShowNewMsg(false);
       setUnreadCount(0);
       markReadOnView();
-    });
+      return;
+    }
+    const stepCount = Math.min(40, Math.max(1, Math.ceil(distance / 25)));
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      const progress = step / stepCount;
+      const eased = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      el.scrollTop = scrollStart + distance * eased;
+      if (step >= stepCount) {
+        clearInterval(interval);
+        requestAnimationFrame(() => {
+          el.scrollTop = el.scrollHeight;
+          setShowNewMsg(false);
+          setUnreadCount(0);
+          markReadOnView();
+        });
+      }
+    }, 25);
   }, [markReadOnView]);
 
   useEffect(() => {
@@ -482,6 +535,7 @@ const ChatWindow = () => {
             </React.Fragment>
           ))
         )}
+
 
         {isTyping && <TypingIndicator user={isGroup ? null : other} />}
         <div ref={messagesEndRef} />

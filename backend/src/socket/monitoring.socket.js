@@ -295,8 +295,8 @@ module.exports = (io, socket) => {
     // If streamer
     const info = streamerInfo.get(streamerUserId);
     if (info && info.socketId === socket.id) {
-      cleanupStreamer(io, streamerUserId);
-    }
+          cleanupStreamer(io, streamerUserId);
+        }
 
     // If viewer
     const entry = viewerSockets.get(socket.id);

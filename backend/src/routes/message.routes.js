@@ -8,7 +8,6 @@ const {
   editMessage,
   deleteMessage,
   forwardMessage,
-  toggleFavorite,
   clearConversation,
   deleteConversation,
   uploadFile,
@@ -21,7 +20,6 @@ const upload = multer({ dest: path.join(__dirname, '../../uploads') });
 
 router.get('/conversations', protect, getConversations);
 router.get('/conversations/:userId', protect, getOrCreateConversation);
-router.put('/conversations/:conversationId/favorite', protect, toggleFavorite);
 router.delete('/conversations/:conversationId/messages', protect, clearConversation);
 router.delete('/conversations/:conversationId', protect, deleteConversation);
 router.post('/upload/file', protect, upload.single('file'), uploadFile);

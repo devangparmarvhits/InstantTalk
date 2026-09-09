@@ -1,13 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 
 const MenuIcon = ({ type }) => {
-  if (type === 'favorite') return <span aria-hidden="true">★</span>;
   if (type === 'clear') return <span aria-hidden="true">⌫</span>;
   if (type === 'delete') return <span aria-hidden="true">🗑</span>;
   return <span aria-hidden="true">⊘</span>;
 };
 
-const ConversationContextMenu = ({ x, y, isFavorite, deleteLabel = 'Delete user', blockLabel = 'Block user', onClose, onFavorite, onClear, onDelete, onBlock }) => {
+const ConversationContextMenu = ({ x, y, deleteLabel = 'Delete user', blockLabel = 'Block user', onClose, onClear, onDelete, onBlock }) => {
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -40,10 +39,6 @@ const ConversationContextMenu = ({ x, y, isFavorite, deleteLabel = 'Delete user'
 
   return (
     <div ref={menuRef} className="conversation-context-menu" style={{ top: y, left: x }}>
-      <button className="conversation-context-item" onClick={() => action(onFavorite)}>
-        <MenuIcon type="favorite" />
-        {isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-      </button>
       <button className="conversation-context-item" onClick={() => action(onClear)}>
         <MenuIcon type="clear" />
         Clear all chat

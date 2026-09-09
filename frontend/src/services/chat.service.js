@@ -32,11 +32,6 @@ export const uploadFile = async (formData) => {
   return res.data;
 };
 
-export const toggleFavorite = async (conversationId) => {
-  const res = await api.put(`/api/messages/conversations/${conversationId}/favorite`);
-  return res.data;
-};
-
 export const clearConversation = async (conversationId) => {
   const res = await api.delete(`/api/messages/conversations/${conversationId}/messages`);
   return res.data;

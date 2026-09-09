@@ -132,22 +132,6 @@ const forwardMessage = async (req, res) => {
   }
 };
 
-const toggleFavorite = async (req, res) => {
-  try {
-    const conv = await Conversation.findById(req.params.conversationId);
-    if (!conv) return errorResponse(res, 'Conversation not found', 404);
-
-    const current = conv.isFavorite?.get(req.user._id.toString()) || false;
-    conv.isFavorite = conv.isFavorite || new Map();
-    conv.isFavorite.set(req.user._id.toString(), !current);
-    await conv.save();
-
-    return successResponse(res, { isFavorite: !current }, 'Favorite toggled');
-  } catch (error) {
-    return errorResponse(res, error.message);
-  }
-};
-
 const clearConversation = async (req, res) => {
   try {
     await Message.deleteMany({ conversationId: req.params.conversationId });
@@ -191,7 +175,6 @@ module.exports = {
   editMessage,
   deleteMessage,
   forwardMessage,
-  toggleFavorite,
   clearConversation,
   deleteConversation,
   uploadFile,

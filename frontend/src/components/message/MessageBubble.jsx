@@ -246,25 +246,39 @@ const MessageBubble = ({ message, isSent, showAvatar, user, onReply, isGroup, is
 
   const hasReactions = !!message.reactions && Object.keys(message.reactions).length > 0;
 
-  const renderContent = () => {
-    if (message.type === 'call') {
-      const call = getCallDetails(message.content);
-      const callTitle = call.isGroup
-        ? (call.callType === 'video' ? 'Group video call' : 'Group voice call')
-        : (call.callType === 'video' ? 'Video call' : 'Voice call');
-      return (
-        <div className={`call-message-log ${call.callType} ${call.isGroup ? 'group' : ''}`}>
-          <span className="call-message-icon"><CallIcon callType={call.callType} /></span>
-          <span className="call-message-details">
-            <strong>{callTitle}</strong>
-            <span className={call.status === 'Missed' ? 'call-message-missed' : ''}>
-              {call.status}{call.isGroup && call.participantCount ? ` · ${call.participantCount} participants` : ''}{call.duration ? ` · ${call.duration}` : ''}
-            </span>
-          </span>
-        </div>
-      );
-    }
+  // Call logs — centered like WhatsApp
+  if (message.type === 'call') {
+    const call = getCallDetails(message.content);
+    const isOutgoing = isSent;
+    const title = call.isGroup
+      ? (call.callType === 'video' ? 'Group video call' : 'Group voice call')
+      : (call.callType === 'video' ? 'Video call' : 'Voice call');
+    const isMissed = call.status === 'Missed';
+    const detail = isMissed
+      ? ''
+      : call.status === 'Cancelled'
+        ? 'Cancelled'
+        : call.duration
+          ? (call.isGroup && call.participantCount ? `${call.participantCount} participants · ${call.duration}` : call.duration)
+          : 'Connected';
 
+    return (
+      <div className="message-row call-message-row" id={`msg-${message._id}`}>
+        <div className={`call-message-log ${call.callType} ${isOutgoing ? 'outgoing' : 'incoming'}${call.isGroup ? ' group' : ''}${isMissed ? ' missed' : ''}`}>
+          <span className="call-message-icon">
+            <CallIcon callType={call.callType} />
+          </span>
+          <span className="call-message-details">
+            <strong className={isMissed ? 'call-message-missed' : ''}>{isMissed ? `Missed ${title}` : title}</strong>
+            {detail && <span>{detail}</span>}
+          </span>
+          <span className="call-message-time">{timeStr}</span>
+        </div>
+      </div>
+    );
+  }
+
+  const renderContent = () => {
     if (message.type === 'image') {
       const { url } = parseFileContent(message.content);
       const src = getFileUrl(url);
