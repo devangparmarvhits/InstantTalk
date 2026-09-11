@@ -89,7 +89,7 @@ export const togglePinMessage = async (messageId, groupId) => {
 
 // ═══ REACTIONS ═══
 export const toggleReaction = async (messageId, emoji) => {
-  const res = await api.post(`/api/groups/messages/${messageId}/reaction`, { emoji });
+  const res = await api.post(`/api/messages/${messageId}/reaction`, { emoji });
   return res.data;
 };
 
