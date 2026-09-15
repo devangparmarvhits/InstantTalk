@@ -1,5 +1,5 @@
 const express = require('express');
-const { register, login, getMe } = require('../controllers/auth.controller');
+const { register, login, refresh, logout, getMe } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
@@ -90,6 +90,64 @@ router.post('/register', register);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/login', login);
+
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Exchange a refresh token for a new access token (and rotated refresh token)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Token refreshed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RefreshResponse'
+ *       401:
+ *         description: Invalid or expired refresh token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.post('/refresh', refresh);
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Revoke the provided refresh token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Logged out
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.post('/logout', logout);
 
 /**
  * @swagger

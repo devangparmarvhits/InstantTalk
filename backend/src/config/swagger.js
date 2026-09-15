@@ -47,9 +47,17 @@ const options = {
               type: 'object',
               properties: {
                 user: { $ref: '#/components/schemas/User' },
-                token: { type: 'string' },
+                accessToken: { type: 'string', description: 'Short-lived access token (JWT)' },
+                refreshToken: { type: 'string', description: 'Long-lived refresh token (JWT)' },
               },
             },
+          },
+        },
+        RefreshResponse: {
+          type: 'object',
+          properties: {
+            accessToken: { type: 'string', description: 'New access token (JWT)' },
+            refreshToken: { type: 'string', description: 'Rotated refresh token (JWT)' },
           },
         },
         Conversation: {

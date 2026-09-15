@@ -1,6 +1,15 @@
 const User = require('../models/User');
-const { generateToken } = require('../utils/jwt');
+const {
+  generateToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+  hashToken,
+} = require('../utils/jwt');
 const { successResponse, errorResponse } = require('../utils/response');
+
+const saveRefreshToken = async (userId, refreshToken) => {
+  await User.updateOne({ _id: userId }, { $push: { refreshTokens: hashToken(refreshToken) } });
+};
 
 const register = async (req, res) => {
   try {
@@ -15,9 +24,11 @@ const register = async (req, res) => {
     }
 
     const user = await User.create({ name, email, password });
-    const token = generateToken(user._id);
+    const accessToken = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+    await saveRefreshToken(user._id, refreshToken);
 
-    return successResponse(res, { user, token }, 'Registered successfully', 201);
+    return successResponse(res, { user, accessToken, refreshToken }, 'Registered successfully', 201);
   } catch (error) {
     return errorResponse(res, error.message);
   }
@@ -35,8 +46,73 @@ const login = async (req, res) => {
       return errorResponse(res, 'Invalid credentials', 401);
     }
 
-    const token = generateToken(user._id);
-    return successResponse(res, { user, token }, 'Logged in successfully');
+    const accessToken = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+    await saveRefreshToken(user._id, refreshToken);
+
+    return successResponse(res, { user, accessToken, refreshToken }, 'Logged in successfully');
+  } catch (error) {
+    return errorResponse(res, error.message);
+  }
+};
+
+const refresh = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return errorResponse(res, 'Refresh token is required', 400);
+    }
+
+    let payload;
+    try {
+      payload = verifyRefreshToken(refreshToken);
+    } catch {
+      return errorResponse(res, 'Invalid refresh token', 401);
+    }
+
+    const user = await User.findById(payload.id).select('+refreshTokens');
+    if (!user) {
+      return errorResponse(res, 'User not found', 401);
+    }
+
+    const tokenHash = hashToken(refreshToken);
+    if (!user.refreshTokens.includes(tokenHash)) {
+      return errorResponse(res, 'Invalid refresh token', 401);
+    }
+
+    user.refreshTokens = user.refreshTokens.filter((t) => t !== tokenHash);
+
+    const accessToken = generateToken(user._id);
+    const newRefreshToken = generateRefreshToken(user._id);
+    user.refreshTokens.push(hashToken(newRefreshToken));
+    await user.save();
+
+    return res.status(200).json({ accessToken, refreshToken: newRefreshToken });
+  } catch (error) {
+    return errorResponse(res, error.message);
+  }
+};
+
+const logout = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return errorResponse(res, 'Refresh token is required', 400);
+    }
+
+    let payload;
+    try {
+      payload = verifyRefreshToken(refreshToken);
+    } catch {
+      return successResponse(res, {}, 'Logged out');
+    }
+
+    await User.updateOne(
+      { _id: payload.id },
+      { $pull: { refreshTokens: hashToken(refreshToken) } }
+    );
+
+    return successResponse(res, {}, 'Logged out');
   } catch (error) {
     return errorResponse(res, error.message);
   }
@@ -50,4 +126,4 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe };
+module.exports = { register, login, refresh, logout, getMe };

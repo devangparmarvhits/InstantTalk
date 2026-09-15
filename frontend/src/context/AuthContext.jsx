@@ -1,11 +1,22 @@
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
-import { login as loginApi, register as registerApi, getMe } from '../services/auth.service';
+import {
+  login as loginApi,
+  register as registerApi,
+  getMe,
+  logout as logoutApi,
+} from '../services/auth.service';
 import { initSocket, disconnectSocket } from '../socket/socket';
 
 export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('it_user'));
+    } catch {
+      return null;
+    }
+  });
   const [token, setToken] = useState(() => localStorage.getItem('it_token'));
   const [loading, setLoading] = useState(true);
 
@@ -58,14 +69,16 @@ export const AuthProvider = ({ children }) => {
   // Load user on mount if token exists
   useEffect(() => {
     const loadUser = async () => {
-      if (token) {
+      const storedToken = localStorage.getItem('it_token');
+      if (storedToken) {
         try {
           const data = await getMe();
           setUser(data.data.user);
-          initSocket(token);
+          localStorage.setItem('it_user', JSON.stringify(data.data.user));
+          setToken(localStorage.getItem('it_token') || storedToken);
+          initSocket(localStorage.getItem('it_token') || storedToken);
         } catch {
-          localStorage.removeItem('it_token');
-          localStorage.removeItem('it_user');
+          setUser(null);
           setToken(null);
         }
       }
@@ -75,23 +88,40 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
+  // Keep socket + tokens in sync whenever the access token is silently refreshed
+  useEffect(() => {
+    const onTokensRefreshed = () => {
+      const newToken = localStorage.getItem('it_token');
+      if (newToken) {
+        setToken(newToken);
+        initSocket(newToken);
+      }
+    };
+    window.addEventListener('it_tokens_refreshed', onTokensRefreshed);
+    return () => window.removeEventListener('it_tokens_refreshed', onTokensRefreshed);
+  }, []);
+
   const login = useCallback(async (email, password) => {
     const data = await loginApi(email, password);
-    const { user: u, token: t } = data.data;
+    const { user: u, accessToken, refreshToken } = data.data;
     setUser(u);
-    setToken(t);
-    localStorage.setItem('it_token', t);
-    initSocket(t);
+    setToken(accessToken);
+    localStorage.setItem('it_token', accessToken);
+    localStorage.setItem('it_refresh_token', refreshToken);
+    localStorage.setItem('it_user', JSON.stringify(u));
+    initSocket(accessToken);
     return u;
   }, []);
 
   const register = useCallback(async (name, email, password) => {
     const data = await registerApi(name, email, password);
-    const { user: u, token: t } = data.data;
+    const { user: u, accessToken, refreshToken } = data.data;
     setUser(u);
-    setToken(t);
-    localStorage.setItem('it_token', t);
-    initSocket(t);
+    setToken(accessToken);
+    localStorage.setItem('it_token', accessToken);
+    localStorage.setItem('it_refresh_token', refreshToken);
+    localStorage.setItem('it_user', JSON.stringify(u));
+    initSocket(accessToken);
     return u;
   }, []);
 
@@ -111,15 +141,23 @@ export const AuthProvider = ({ children }) => {
       try { cb(); } catch (err) { console.error('logout cleanup error:', err); }
     });
     logoutCallbacks.current = [];
+
+    const refreshToken = localStorage.getItem('it_refresh_token');
+    if (refreshToken) {
+      logoutApi(refreshToken).catch(() => {});
+    }
+
     disconnectSocket();
     setUser(null);
     setToken(null);
     localStorage.removeItem('it_token');
+    localStorage.removeItem('it_refresh_token');
     localStorage.removeItem('it_user');
   }, []);
 
   const updateUser = useCallback((updatedUser) => {
     setUser(updatedUser);
+    localStorage.setItem('it_user', JSON.stringify(updatedUser));
   }, []);
 
   return (

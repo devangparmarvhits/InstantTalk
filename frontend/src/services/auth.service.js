@@ -14,3 +14,13 @@ export const getMe = async () => {
   const res = await api.get('/api/auth/me');
   return res.data;
 };
+
+export const refresh = async (refreshToken) => {
+  const res = await api.post('/api/auth/refresh', { refreshToken });
+  return res.data;
+};
+
+export const logout = async (refreshToken) => {
+  const res = await api.post('/api/auth/logout', { refreshToken });
+  return res.data;
+};

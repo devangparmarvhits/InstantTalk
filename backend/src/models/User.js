@@ -23,6 +23,11 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
       select: false,
     },
+    refreshTokens: {
+      type: [String],
+      select: false,
+      default: [],
+    },
     avatar: {
       type: String,
       default: '',
@@ -120,6 +125,7 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.refreshTokens;
   return obj;
 };
 
