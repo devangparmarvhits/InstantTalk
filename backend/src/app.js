@@ -4,6 +4,9 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
+
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const messageRoutes = require('./routes/message.routes');
@@ -29,6 +32,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/calls', callRoutes);
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
