@@ -52,7 +52,7 @@ const Register = () => {
     setLoading(true);
     try {
       await register(name, email, password);
-      navigate('/chat');
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Registration failed. Please try again.');
     } finally {
@@ -124,7 +124,7 @@ const Register = () => {
                   right: '12px',
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-muted)',
+                  color: '#5a6478',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -159,7 +159,7 @@ const Register = () => {
                   right: '12px',
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-muted)',
+                  color: '#5a6478',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',

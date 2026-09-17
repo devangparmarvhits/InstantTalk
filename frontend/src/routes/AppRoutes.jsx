@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
+import VerifyEmail from '../pages/VerifyEmail';
+import OAuthCallback from '../pages/OAuthCallback';
 import ChatPage from '../pages/Chat';
 import Profile from '../pages/Profile';
 import Calls from '../pages/Calls';
@@ -42,6 +44,8 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/oauth/google/callback" element={<OAuthCallback />} />
         <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/people" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />

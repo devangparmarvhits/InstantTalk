@@ -30,7 +30,7 @@ const LogoutIcon = ({ size = 18 }) => (
 const DEFAULT_SETTINGS = {
   privacy: { lastSeen: 'everyone', onlineStatus: true, readReceipts: true, profilePhoto: 'everyone' },
   notifications: { messages: true, sound: true, preview: true },
-  appearance: { theme: 'system', fontSize: 'medium' },
+  appearance: { theme: 'dark', fontSize: 'medium' },
 };
 
 const WHO_OPTIONS = [

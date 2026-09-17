@@ -13,7 +13,7 @@ const normalizeSettings = (settings) => {
       preview: settings.notifications?.preview !== false,
     },
     appearance: {
-      theme: settings.appearance?.theme || 'system',
+      theme: settings.appearance?.theme || 'dark',
       fontSize: settings.appearance?.fontSize || 'medium',
     },
   };

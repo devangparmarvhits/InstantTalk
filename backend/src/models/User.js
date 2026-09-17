@@ -28,6 +28,29 @@ const userSchema = new mongoose.Schema(
       select: false,
       default: [],
     },
+    googleId: {
+      type: String,
+      default: undefined,
+    },
+    provider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local',
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationOtpHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    emailVerificationOtpExpires: {
+      type: Date,
+      select: false,
+      default: null,
+    },
     avatar: {
       type: String,
       default: '',
@@ -91,7 +114,7 @@ const userSchema = new mongoose.Schema(
                 theme: {
                   type: String,
                   enum: ['dark', 'light', 'system'],
-                  default: 'system',
+                  default: 'dark',
                 },
                 fontSize: {
                   type: String,
@@ -101,7 +124,7 @@ const userSchema = new mongoose.Schema(
               },
               { _id: false }
             ),
-            default: () => ({}),
+            default: () => ({ theme: 'dark', fontSize: 'medium' }),
           },
         },
         { _id: false }
@@ -128,5 +151,7 @@ userSchema.methods.toJSON = function () {
   delete obj.refreshTokens;
   return obj;
 };
+
+userSchema.index({ emailVerificationOtpExpires: 1 }, { expireAfterSeconds: 0, partialFilterExpression: { emailVerificationOtpExpires: { $ne: null } } });
 
 module.exports = mongoose.model('User', userSchema);

@@ -6,6 +6,7 @@ const path = require('path');
 
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
+const passport = require('./config/passport');
 
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
@@ -24,6 +25,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(passport.initialize());
 app.use(morgan('dev'));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

@@ -24,3 +24,13 @@ export const logout = async (refreshToken) => {
   const res = await api.post('/api/auth/logout', { refreshToken });
   return res.data;
 };
+
+export const verifyOtp = async (email, otp) => {
+  const res = await api.post('/api/auth/verify-otp', { email, otp });
+  return res.data;
+};
+
+export const resendOtp = async () => {
+  const res = await api.post('/api/auth/resend-otp');
+  return res.data;
+};

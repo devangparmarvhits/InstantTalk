@@ -32,6 +32,7 @@ const options = {
             _id: { type: 'string' },
             name: { type: 'string', minLength: 2, maxLength: 50 },
             email: { type: 'string', format: 'email' },
+            emailVerified: { type: 'boolean' },
             avatar: { type: 'string' },
             bio: { type: 'string', maxLength: 200 },
             isOnline: { type: 'boolean' },

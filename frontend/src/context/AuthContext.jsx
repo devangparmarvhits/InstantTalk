@@ -9,10 +9,26 @@ import { initSocket, disconnectSocket } from '../socket/socket';
 
 export const AuthContext = createContext(null);
 
+const ensureDarkDefault = (u) => {
+  if (!u) return u;
+  if (!u.settings) u.settings = {};
+  if (!u.settings.appearance) u.settings.appearance = {};
+  if (!u.settings.appearance.theme || u.settings.appearance.theme === 'system') {
+    u.settings.appearance.theme = 'dark';
+  }
+  return u;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('it_user'));
+      const u = JSON.parse(localStorage.getItem('it_user'));
+      if (u) {
+        const sanitized = ensureDarkDefault(u);
+        localStorage.setItem('it_user', JSON.stringify(sanitized));
+        return sanitized;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -23,7 +39,7 @@ export const AuthProvider = ({ children }) => {
   // Apply the user's appearance settings (theme + font size) to the document
   const applyAppearance = useCallback((settings) => {
     const appearance = settings?.appearance || {};
-    const theme = appearance.theme || 'system';
+    const theme = appearance.theme || 'dark';
     const fontSize = appearance.fontSize || 'medium';
     const root = document.documentElement;
     root.setAttribute('data-theme-pref', theme);
@@ -58,7 +74,7 @@ export const AuthProvider = ({ children }) => {
     applyAppearance(user.settings);
     const mq = systemThemeQuery();
     const onSystemThemeChange = () => {
-      if ((user.settings?.appearance?.theme || 'system') === 'system') {
+      if ((user.settings?.appearance?.theme || 'dark') === 'system') {
         applyAppearance(user.settings);
       }
     };
@@ -73,8 +89,9 @@ export const AuthProvider = ({ children }) => {
       if (storedToken) {
         try {
           const data = await getMe();
-          setUser(data.data.user);
-          localStorage.setItem('it_user', JSON.stringify(data.data.user));
+          const sanitized = ensureDarkDefault(data.data.user);
+          setUser(sanitized);
+          localStorage.setItem('it_user', JSON.stringify(sanitized));
           setToken(localStorage.getItem('it_token') || storedToken);
           initSocket(localStorage.getItem('it_token') || storedToken);
         } catch {
@@ -103,7 +120,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async (email, password) => {
     const data = await loginApi(email, password);
-    const { user: u, accessToken, refreshToken } = data.data;
+    const { user: rawUser, accessToken, refreshToken } = data.data;
+    const u = ensureDarkDefault(rawUser);
     setUser(u);
     setToken(accessToken);
     localStorage.setItem('it_token', accessToken);
@@ -115,7 +133,8 @@ export const AuthProvider = ({ children }) => {
 
   const register = useCallback(async (name, email, password) => {
     const data = await registerApi(name, email, password);
-    const { user: u, accessToken, refreshToken } = data.data;
+    const { user: rawUser, accessToken, refreshToken } = data.data;
+    const u = ensureDarkDefault(rawUser);
     setUser(u);
     setToken(accessToken);
     localStorage.setItem('it_token', accessToken);
@@ -156,12 +175,26 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const updateUser = useCallback((updatedUser) => {
-    setUser(updatedUser);
-    localStorage.setItem('it_user', JSON.stringify(updatedUser));
+    const sanitized = ensureDarkDefault(updatedUser);
+    setUser(sanitized);
+    localStorage.setItem('it_user', JSON.stringify(sanitized));
+  }, []);
+
+  // Called by the Google OAuth callback page with the tokens from the URL fragment
+  const handleOAuthTokens = useCallback(async (accessToken, refreshToken) => {
+    localStorage.setItem('it_token', accessToken);
+    localStorage.setItem('it_refresh_token', refreshToken);
+    const data = await getMe();
+    const u = ensureDarkDefault(data.data.user);
+    setUser(u);
+    setToken(accessToken);
+    localStorage.setItem('it_user', JSON.stringify(u));
+    initSocket(accessToken);
+    return u;
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser, applyAppearance, registerLogoutCallback }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser, handleOAuthTokens, applyAppearance, registerLogoutCallback }}>
       {children}
     </AuthContext.Provider>
   );
