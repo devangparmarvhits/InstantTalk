@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 
-const DEFAULT_SOCKET_URL = 'http://localhost:5000';
+const DEFAULT_SOCKET_URL = 'https://instanttalk-2.onrender.com';
 const SOCKET_URL = (() => {
   const envValue = import.meta.env.VITE_SOCKET_URL;
   if (envValue && envValue.trim()) return envValue.trim();
