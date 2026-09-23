@@ -9,6 +9,7 @@ import ChatPage from '../pages/Chat';
 import Profile from '../pages/Profile';
 import Calls from '../pages/Calls';
 import { LiveMonitoring } from '../pages/LiveStreams';
+import Home from '../pages/Home';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
@@ -42,6 +43,7 @@ const AppRoutes = () => {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<PublicRoute><Home /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/verify-email" element={<VerifyEmail />} />
@@ -52,8 +54,7 @@ const AppRoutes = () => {
         <Route path="/groups" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
         <Route path="/calls" element={<ProtectedRoute><Calls /></ProtectedRoute>} />
         <Route path="/monitoring" element={<ProtectedRoute><LiveMonitoring /></ProtectedRoute>} />
-        <Route path="/" element={<Navigate to="/chat" replace />} />
-        <Route path="*" element={<Navigate to="/chat" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

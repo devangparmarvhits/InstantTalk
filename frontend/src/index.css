@@ -111,13 +111,17 @@ body {
   padding: 0;
 }
 
-html, body, #root {
+html {
   height: 100%;
   width: 100%;
-  overflow: hidden;
+  scroll-behavior: smooth;
 }
 
 body {
+  min-height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
   font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -125,6 +129,11 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100%;
+  width: 100%;
 }
 
 button {
